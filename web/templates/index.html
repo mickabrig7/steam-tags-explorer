@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Tags Explorer</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --surface2: #0f3460;
+            --accent: #e94560;
+            --accent2: #533483;
+            --text: #eee;
+            --text-dim: #888;
+            --border: #333;
+            --success: #00d474;
+            --warning: #ffaa00;
+            --unexplored: #ff6b6b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2em;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            color: var(--text-dim);
+            font-size: 0.95em;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 12px;
+            font-size: 0.85em;
+            color: var(--text-dim);
+        }
+
+        .stats-bar span {
+            background: var(--surface);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        /* Controls */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-panel {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .control-panel h3 {
+            font-size: 1em;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+
+        .tag-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .tag-chip {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            transition: all 0.15s;
+            user-select: none;
+        }
+
+        .tag-chip:hover {
+            border-color: var(--accent);
+        }
+
+        .tag-chip.selected {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .tag-chip .count {
+            font-size: 0.75em;
+            color: var(--text-dim);
+            margin-left: 4px;
+        }
+
+        .tag-chip.selected .count {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .search-result-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.85em;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .search-result-item:hover {
+            background: var(--surface2);
+        }
+
+        .search-result-item .freq {
+            color: var(--text-dim);
+            font-size: 0.85em;
+        }
+
+        /* N-selector */
+        .n-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .n-selector label {
+            font-size: 0.9em;
+            color: var(--text-dim);
+        }
+
+        .n-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.15s;
+        }
+
+        .n-btn.active {
+            background: var(--accent2);
+            border-color: var(--accent2);
+        }
+
+        .n-btn:hover {
+            border-color: var(--accent);
+        }
+
+        /* Range controls */
+        .range-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 0.85em;
+        }
+
+        .range-row label {
+            color: var(--text-dim);
+            min-width: 80px;
+        }
+
+        .range-row input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent);
+        }
+
+        .range-row .value {
+            min-width: 50px;
+            text-align: right;
+            color: var(--text-dim);
+        }
+
+        .btn {
+            padding: 8px 20px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: opacity 0.15s;
+        }
+
+        .btn:hover {
+            opacity: 0.85;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Checkbox */
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 0.85em;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            accent-color: var(--accent);
+            width: 16px;
+            height: 16px;
+        }
+
+        .checkbox-row label {
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .checkbox-row .hint {
+            color: var(--text-dim);
+            font-size: 0.85em;
+        }
+
+        /* Results */
+        .results-section {
+            margin-top: 20px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .results-header h2 {
+            font-size: 1.2em;
+        }
+
+        .results-count {
+            color: var(--text-dim);
+            font-size: 0.85em;
+        }
+
+        /* Combination cards */
+        .combo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 12px;
+        }
+
+        .combo-card {
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+        }
+
+        .combo-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .combo-card.unexplored {
+            border-color: var(--unexplored);
+            background: linear-gradient(135deg, var(--surface), rgba(233, 69, 96, 0.08));
+        }
+
+        .combo-card.unexplored:hover {
+            border-color: var(--unexplored);
+        }
+
+        .unexplored-badge {
+            position: absolute;
+            top: -8px;
+            right: 12px;
+            background: var(--unexplored);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .combo-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .combo-tag {
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+        }
+
+        .combo-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            font-size: 0.75em;
+        }
+
+        .combo-stat {
+            text-align: center;
+        }
+
+        .combo-stat .label {
+            color: var(--text-dim);
+            font-size: 0.85em;
+        }
+
+        .combo-stat .value {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .combo-stat .value.rare {
+            color: var(--success);
+        }
+
+        .combo-stat .value.common {
+            color: var(--warning);
+        }
+
+        .combo-stat .value.zero {
+            color: var(--unexplored);
+        }
+
+        /* Games list */
+        .games-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            overflow-y: auto;
+            padding: 40px 20px;
+        }
+
+        .games-modal.active {
+            display: block;
+        }
+
+        .games-modal-content {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .games-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .games-modal-header h2 {
+            font-size: 1.3em;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+
+        .game-card {
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .game-info {
+            flex: 1;
+        }
+
+        .game-appid {
+            color: var(--text-dim);
+            font-size: 0.85em;
+        }
+
+        .game-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .game-tag {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            background: var(--bg);
+            border: 1px solid var(--border);
+        }
+
+        .game-tag.highlight {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .game-link {
+            padding: 6px 14px;
+            border-radius: 6px;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            font-size: 0.85em;
+            white-space: nowrap;
+            margin-left: 12px;
+        }
+
+        .game-link:hover {
+            opacity: 0.85;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dim);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Sort controls */
+        .sort-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .sort-controls label {
+            font-size: 0.85em;
+            color: var(--text-dim);
+        }
+
+        .sort-controls select {
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.85em;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: var(--text);
+        }
+
+        .empty-state p {
+            font-size: 0.9em;
+        }
+
+        /* Quick filter buttons */
+        .quick-filters {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .quick-filter-btn {
+            padding: 4px 10px;
+            border-radius: 15px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.75em;
+            transition: all 0.15s;
+        }
+
+        .quick-filter-btn:hover {
+            border-color: var(--accent);
+            color: var(--text);
+        }
+
+        .quick-filter-btn.active {
+            background: var(--accent2);
+            border-color: var(--accent2);
+            color: var(--text);
+        }
+
+        .tag-count-info {
+            font-size: 0.8em;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+
+        /* Unexplored modal banner */
+        .unexplored-banner {
+            background: linear-gradient(135deg, rgba(233, 69, 96, 0.15), rgba(83, 52, 131, 0.15));
+            border: 1px solid var(--unexplored);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .unexplored-banner h3 {
+            color: var(--unexplored);
+            margin-bottom: 6px;
+        }
+
+        .unexplored-banner p {
+            color: var(--text-dim);
+            font-size: 0.9em;
+        }
+
+        /* Tab switcher */
+        .tab-switcher {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 4px;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: var(--text);
+        }
+
+        /* Random mode */
+        .random-mode {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .random-mode h2 {
+            margin-bottom: 8px;
+            font-size: 1.5em;
+        }
+
+        .random-mode .subtitle {
+            color: var(--text-dim);
+            margin-bottom: 30px;
+        }
+
+        .chest-btn {
+            padding: 16px 40px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: white;
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: 700;
+            transition: all 0.2s;
+            box-shadow: 0 4px 20px rgba(233, 69, 96, 0.3);
+        }
+
+        .chest-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 30px rgba(233, 69, 96, 0.5);
+        }
+
+        .chest-btn:disabled {
+            opacity: 0.5;
+            transform: none;
+        }
+
+        /* Slot machine animation */
+        .slot-machine {
+            display: none;
+            margin: 30px auto;
+            max-width: 600px;
+        }
+
+        .slot-machine.active {
+            display: block;
+        }
+
+        .slot-reel-container {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid var(--border);
+            margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slot-reel-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 30%;
+            background: linear-gradient(to bottom, var(--surface), transparent);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .slot-reel-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30%;
+            background: linear-gradient(to top, var(--surface), transparent);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .slot-reel {
+            height: 60px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .slot-item {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--text);
+            padding: 0 10px;
+        }
+
+        .slot-item.spinning {
+            animation: slotSpin 0.1s linear infinite;
+        }
+
+        @keyframes slotSpin {
+            0% { transform: translateY(-100%); opacity: 0; }
+            50% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(100%); opacity: 0; }
+        }
+
+        .slot-reel-container.revealed {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
+        }
+
+        .slot-reel-container.unexplored-reveal {
+            border-color: var(--unexplored);
+            box-shadow: 0 0 30px rgba(255, 107, 107, 0.5);
+            animation: unexploredPulse 0.5s ease-out;
+        }
+
+        @keyframes unexploredPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .slot-divider {
+            height: 2px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+
+        .reveal-stats {
+            display: none;
+            margin-top: 20px;
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .reveal-stats.active {
+            display: block;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .reveal-stats .stat-row {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 12px;
+        }
+
+        .reveal-stats .stat-item {
+            text-align: center;
+        }
+
+        .reveal-stats .stat-item .label {
+            color: var(--text-dim);
+            font-size: 0.85em;
+        }
+
+        .reveal-stats .stat-item .value {
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+
+        .reveal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+
+        .reveal-actions .btn {
+            padding: 10px 24px;
+        }
+
+        /* Particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: particleFall 1s ease-out forwards;
+        }
+
+        @keyframes particleFall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 12px;
+            }
+
+            header {
+                padding: 20px 0 15px;
+            }
+
+            header h1 {
+                font-size: 1.5em;
+            }
+
+            .stats-bar {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .controls {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .control-panel {
+                padding: 14px;
+            }
+
+            .combo-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .combo-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .n-selector {
+                flex-wrap: wrap;
+            }
+
+            .n-btn {
+                flex: 1;
+                text-align: center;
+            }
+
+            .range-row {
+                flex-wrap: wrap;
+            }
+
+            .range-row label {
+                min-width: 100%;
+            }
+
+            .range-row input[type="range"] {
+                width: 100%;
+            }
+
+            .games-modal {
+                padding: 20px 12px;
+            }
+
+            .game-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .game-link {
+                margin-left: 0;
+                margin-top: 8px;
+                align-self: flex-end;
+            }
+
+            .tab-switcher {
+                max-width: 100%;
+            }
+
+            .reveal-actions {
+                flex-direction: column;
+            }
+
+            .reveal-actions .btn {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header h1 {
+                font-size: 1.3em;
+            }
+
+            .combo-card {
+                padding: 12px;
+            }
+
+            .combo-tag {
+                font-size: 0.75em;
+            }
+
+            .combo-stat .value {
+                font-size: 1em;
+            }
+
+            .quick-filters {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Steam Tags Explorer</h1>
+            <p>Discover unexplored game design spaces through rare tag combinations</p>
+            <div class="stats-bar">
+                <span id="stat-games">Loading...</span>
+                <span id="stat-tags">Loading...</span>
+            </div>
+        </header>
+
+        <!-- Tab Switcher -->
+        <div class="tab-switcher">
+            <button class="tab-btn active" data-tab="explorer">🔍 Explorer</button>
+            <button class="tab-btn" data-tab="random">🎲 Random</button>
+        </div>
+
+        <!-- Explorer Mode -->
+        <div id="explorer-mode">
+        <div class="controls">
+            <!-- Left: Tag Selection -->
+            <div class="control-panel">
+                <h3>1. Select Tags</h3>
+                <input type="text" class="search-box" id="tag-search" placeholder="Search tags (2+ chars)..." autocomplete="off">
+                <div class="search-results" id="search-results"></div>
+                <div style="display:flex;gap:6px;margin-bottom:8px;">
+                    <button class="quick-filter-btn" id="select-all-tags">Select All</button>
+                    <button class="quick-filter-btn" id="clear-all-tags" data-min="">Clear Selection</button>
+                </div>
+                <div class="tag-count-info" id="tag-count-info">Showing top tags</div>
+                <div class="tag-selector" id="tag-chips"></div>
+                <div class="quick-filters" id="quick-filters">
+                    <button class="quick-filter-btn" data-min="10000">10K+</button>
+                    <button class="quick-filter-btn" data-min="5000">5K+</button>
+                    <button class="quick-filter-btn" data-min="1000">1K+</button>
+                    <button class="quick-filter-btn" data-min="500">500+</button>
+                    <button class="quick-filter-btn" data-min="100">100+</button>
+                    <button class="quick-filter-btn active" data-min="0">All</button>
+                </div>
+            </div>
+
+            <!-- Right: Combination Settings -->
+            <div class="control-panel">
+                <h3>2. Find Combinations</h3>
+                <div class="n-selector">
+                    <label>Combination size:</label>
+                    <button class="n-btn active" data-n="2">2 tags</button>
+                    <button class="n-btn" data-n="3">3 tags</button>
+                    <button class="n-btn" data-n="4">4 tags</button>
+                    <button class="n-btn" data-n="5">5 tags</button>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="include-unexplored" checked>
+                    <label for="include-unexplored">Include unexplored (0 games)</label>
+                    <span class="hint">— combinations with no existing games</span>
+                </div>
+
+                <div class="range-row">
+                    <label>Max games:</label>
+                    <input type="range" id="max-count" min="1" max="2000" value="200">
+                    <span class="value" id="max-count-val">200</span>
+                </div>
+
+                <div class="sort-controls">
+                    <label>Sort by:</label>
+                    <select id="sort-by">
+                        <option value="expected-desc">Expected (highest opportunity)</option>
+                        <option value="count">Count (rarest first)</option>
+                        <option value="lift">Lift score</option>
+                        <option value="pmi">PMI</option>
+                    </select>
+                </div>
+
+                <div id="selection-hint" style="font-size:0.8em;color:var(--text-dim);margin-top:8px;">
+                    Select at least <strong>2</strong> tags to search
+                </div>
+                <button class="btn" id="search-btn" style="width: 100%; margin-top: 12px;" disabled>
+                    Find Rare Combinations
+                </button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-header">
+                <h2>Results</h2>
+                <span class="results-count" id="results-count"></span>
+            </div>
+            <div class="combo-grid" id="combo-grid"></div>
+        </div>
+
+        <!-- Empty state -->
+        <div class="empty-state" id="empty-state">
+            <h3>Ready to explore</h3>
+            <p>Select some tags and click "Find Rare Combinations" to discover unexplored game design spaces.</p>
+        </div>
+        </div>
+
+        <!-- Random Mode -->
+        <div id="random-mode" class="random-mode" style="display: none;">
+            <h2>🎲 Random Combination Generator</h2>
+            <p class="subtitle">Spin the wheel and discover rare tag combinations!</p>
+            <button class="chest-btn" id="spin-btn">🎰 Open Chest</button>
+
+            <div class="slot-machine" id="slot-machine">
+                <div class="slot-reel-container" id="reel-container-0">
+                    <div class="slot-reel" id="reel-0"></div>
+                </div>
+                <div class="slot-reel-container" id="reel-container-1">
+                    <div class="slot-reel" id="reel-1"></div>
+                </div>
+                <div class="slot-reel-container" id="reel-container-2">
+                    <div class="slot-reel" id="reel-2"></div>
+                </div>
+            </div>
+
+            <div class="reveal-stats" id="reveal-stats">
+                <div class="stat-row">
+                    <div class="stat-item">
+                        <div class="label">Games</div>
+                        <div class="value" id="reveal-count">—</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="label">Expected</div>
+                        <div class="value" id="reveal-expected">—</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="label">Lift</div>
+                        <div class="value" id="reveal-lift">—</div>
+                    </div>
+                </div>
+                <div class="reveal-actions">
+                    <button class="btn" id="reveal-explore">🔍 Explore in Explorer</button>
+                    <button class="btn" id="reveal-again">🎰 Spin Again</button>
+                </div>
+            </div>
+        </div>
+
+    <!-- Games Modal -->
+    <div class="games-modal" id="games-modal">
+        <div class="games-modal-content">
+            <div class="games-modal-header">
+                <h2 id="modal-title">Games with this combination</h2>
+                <button class="close-btn" id="modal-close">&times;</button>
+            </div>
+            <div id="modal-games"></div>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            tags: [],
+            selectedTags: [],
+            n: 2,
+            maxCount: 200,
+            includeUnexplored: true,
+            sortBy: 'expected-desc',
+            currentResults: [],
+            currentMinFilter: 0,
+        };
+
+        // Load stats
+        fetch('/api/stats')
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
+            .then(stats => {
+                document.getElementById('stat-games').textContent = `${stats.total_games.toLocaleString()} games`;
+                document.getElementById('stat-tags').textContent = `${stats.total_tags} tags`;
+            })
+            .catch(err => {
+                console.error('Failed to load stats:', err);
+            });
+
+        // Load tags
+        async function loadTags(minCount = 0) {
+            state.currentMinFilter = minCount;
+            try {
+                const resp = await fetch(`/api/tags?min=${minCount}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                state.tags = await resp.json();
+                renderTagChips();
+                updateQuickFilterActive(minCount);
+            } catch (err) {
+                console.error('Failed to load tags:', err);
+                document.getElementById('tag-chips').innerHTML =
+                    '<div style="padding:20px;text-align:center;color:var(--unexplored);">Failed to load tags. Check console for details.</div>';
+            }
+        }
+
+        function updateQuickFilterActive(minCount) {
+            document.querySelectorAll('.quick-filter-btn').forEach(btn => {
+                const btnMin = parseInt(btn.dataset.min);
+                btn.classList.toggle('active', btnMin === minCount);
+            });
+        }
+
+        function renderTagChips() {
+            const container = document.getElementById('tag-chips');
+            container.innerHTML = '';
+            const tags = state.tags; // show all tags, no limit
+            const selectedCount = state.selectedTags.length;
+            let info = `Showing ${tags.length} of ${state.tags.length} tags`;
+            if (selectedCount > 0) {
+                info += ` — ${selectedCount} selected`;
+            }
+            info += ` (click to select)`;
+            document.getElementById('tag-count-info').textContent = info;
+
+            tags.forEach(tag => {
+                const chip = document.createElement('div');
+                chip.className = 'tag-chip';
+                chip.dataset.name = tag.name;
+                chip.innerHTML = `${tag.name}<span class="count">${tag.count.toLocaleString()}</span>`;
+                if (state.selectedTags.includes(tag.name)) {
+                    chip.classList.add('selected');
+                }
+                chip.addEventListener('click', () => toggleTag(tag.name));
+                container.appendChild(chip);
+            });
+        }
+
+        function toggleTag(name) {
+            const idx = state.selectedTags.indexOf(name);
+            if (idx >= 0) {
+                state.selectedTags.splice(idx, 1);
+            } else {
+                state.selectedTags.push(name);
+            }
+            renderTagChips();
+            updateSelectionHint();
+        }
+
+        // Search
+        const searchInput = document.getElementById('tag-search');
+        const searchResults = document.getElementById('search-results');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(async () => {
+                const q = searchInput.value.trim();
+                if (q.length < 2) {
+                    searchResults.innerHTML = '';
+                    return;
+                }
+                try {
+                    const resp = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const results = await resp.json();
+                    searchResults.innerHTML = '';
+                    if (results.length === 0) {
+                        searchResults.innerHTML = '<div style="padding:8px;color:var(--text-dim);font-size:0.85em;">No tags found</div>';
+                        return;
+                    }
+                    results.forEach(tag => {
+                        const item = document.createElement('div');
+                        item.className = 'search-result-item';
+                        item.innerHTML = `<span>${tag.name}</span><span class="freq">${tag.count.toLocaleString()}</span>`;
+                        item.addEventListener('click', () => {
+                            if (!state.selectedTags.includes(tag.name)) {
+                                state.selectedTags.push(tag.name);
+                                renderTagChips();
+                                updateSelectionHint();
+                            }
+                            searchResults.innerHTML = '';
+                            searchInput.value = '';
+                        });
+                        searchResults.appendChild(item);
+                    });
+                } catch (err) {
+                    console.error('Search failed:', err);
+                    searchResults.innerHTML = '<div style="padding:8px;color:var(--unexplored);font-size:0.85em;">Search failed</div>';
+                }
+            }, 300);
+        });
+
+        // Quick filters — filter displayed tags by frequency threshold
+        document.querySelectorAll('.quick-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const min = parseInt(btn.dataset.min);
+                if (isNaN(min)) return; // Skip buttons without data-min (Select All / Clear)
+                // Clear selection and reload tags with the frequency filter
+                state.selectedTags = [];
+                loadTags(min);
+                updateSelectionHint();
+            });
+        });
+
+        // Select All / Clear All buttons
+        document.getElementById('select-all-tags').addEventListener('click', () => {
+            state.selectedTags = state.tags.map(t => t.name);
+            renderTagChips();
+            updateSelectionHint();
+        });
+
+        document.getElementById('clear-all-tags').addEventListener('click', () => {
+            state.selectedTags = [];
+            renderTagChips();
+            updateSelectionHint();
+        });
+
+        function updateSelectionHint() {
+            const hint = document.getElementById('selection-hint');
+            const btn = document.getElementById('search-btn');
+            const needed = state.n;
+            const have = state.selectedTags.length;
+            const maxTags = {2: 432, 3: 200, 4: 50, 5: 25}[state.n] || 25;
+
+            if (have > maxTags) {
+                hint.innerHTML = `<span style="color:var(--unexplored)">Too many tags (${have}) — select ≤${maxTags} for n=${state.n}</span>`;
+                btn.disabled = true;
+            } else if (have >= needed) {
+                hint.innerHTML = `<strong>${have}</strong> tags selected — ready to search`;
+                btn.disabled = false;
+            } else {
+                hint.innerHTML = `Select at least <strong>${needed}</strong> tags to search (${have}/${needed})`;
+                btn.disabled = true;
+            }
+        }
+
+        // N selector
+        document.querySelectorAll('.n-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.n-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.n = parseInt(btn.dataset.n);
+                updateSelectionHint();
+            });
+        });
+
+        // Include unexplored checkbox
+        document.getElementById('include-unexplored').addEventListener('change', (e) => {
+            state.includeUnexplored = e.target.checked;
+        });
+
+        // Range sliders
+        document.getElementById('max-count').addEventListener('input', (e) => {
+            state.maxCount = parseInt(e.target.value);
+            document.getElementById('max-count-val').textContent = e.target.value;
+        });
+
+        document.getElementById('sort-by').addEventListener('change', (e) => {
+            state.sortBy = e.target.value;
+        });
+
+        // Search button
+        document.getElementById('search-btn').addEventListener('click', searchCombinations);
+
+        async function searchCombinations() {
+            const btn = document.getElementById('search-btn');
+            btn.disabled = true;
+            btn.textContent = 'Searching...';
+
+            const minCount = state.includeUnexplored ? 0 : 1;
+            const params = new URLSearchParams({
+                n: state.n,
+                min_count: minCount,
+                max_count: state.maxCount,
+                include_unexplored: state.includeUnexplored ? '1' : '0',
+            });
+
+            if (state.selectedTags.length > 0) {
+                params.set('tags', state.selectedTags.join(','));
+            }
+
+            try {
+                const resp = await fetch(`/api/combinations?${params}`);
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({}));
+                    throw new Error(errData.error || `HTTP ${resp.status}`);
+                }
+                const results = await resp.json();
+
+                // Sort
+                switch (state.sortBy) {
+                    case 'count':
+                        results.sort((a, b) => a.count - b.count);
+                        break;
+                    case 'expected-desc':
+                        results.sort((a, b) => b.expected - a.expected);
+                        break;
+                    case 'lift':
+                        results.sort((a, b) => a.lift - b.lift);
+                        break;
+                    case 'pmi':
+                        results.sort((a, b) => {
+                            const pa = a.pmi ?? -Infinity;
+                            const pb = b.pmi ?? -Infinity;
+                            return pa - pb;
+                        });
+                        break;
+                }
+
+                state.currentResults = results;
+                renderResults(results);
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Error searching combinations: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Find Rare Combinations';
+            }
+        }
+
+        function renderResults(results) {
+            document.getElementById('empty-state').style.display = 'none';
+            const section = document.getElementById('results-section');
+            section.style.display = 'block';
+
+            const unexploredCount = results.filter(r => r.unexplored).length;
+            const rareCount = results.length - unexploredCount;
+            let countText = `${results.length} combinations found`;
+            if (unexploredCount > 0) {
+                countText += ` (${unexploredCount} unexplored, ${rareCount} rare)`;
+            }
+            document.getElementById('results-count').textContent = countText;
+
+            const grid = document.getElementById('combo-grid');
+            grid.innerHTML = '';
+
+            results.forEach(combo => {
+                const card = document.createElement('div');
+                card.className = 'combo-card' + (combo.unexplored ? ' unexplored' : '');
+
+                const tagsHtml = combo.tags.map(t => `<span class="combo-tag">${t}</span>`).join('');
+
+                const liftClass = combo.lift < 0.5 ? 'rare' : 'common';
+                const countClass = combo.count === 0 ? 'zero' : '';
+
+                const pmiDisplay = combo.pmi !== null && combo.pmi !== undefined
+                    ? combo.pmi.toFixed(1)
+                    : '—';
+
+                card.innerHTML = `
+                    ${combo.unexplored ? '<div class="unexplored-badge">UNEXPLORED</div>' : ''}
+                    <div class="combo-tags">${tagsHtml}</div>
+                    <div class="combo-stats">
+                        <div class="combo-stat">
+                            <div class="label">Games</div>
+                            <div class="value ${countClass}">${combo.count}</div>
+                        </div>
+                        <div class="combo-stat">
+                            <div class="label">Expected</div>
+                            <div class="value">${combo.expected}</div>
+                        </div>
+                        <div class="combo-stat">
+                            <div class="label">Lift</div>
+                            <div class="value ${liftClass}">${combo.lift}</div>
+                        </div>
+                        <div class="combo-stat">
+                            <div class="label">PMI</div>
+                            <div class="value">${pmiDisplay}</div>
+                        </div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => showGames(combo));
+                grid.appendChild(card);
+            });
+        }
+
+        async function showGames(combo) {
+            const modal = document.getElementById('games-modal');
+            modal.classList.add('active');
+
+            const title = document.getElementById('modal-title');
+            title.textContent = `Games with: ${combo.tags.join(' + ')}`;
+
+            const container = document.getElementById('modal-games');
+
+            if (combo.unexplored || combo.count === 0) {
+                container.innerHTML = `
+                    <div class="unexplored-banner">
+                        <h3>🎮 Unexplored Combination!</h3>
+                        <p>No games on Steam currently use this exact combination of tags.</p>
+                        <p style="margin-top: 8px;">Expected ~${combo.expected} games based on individual tag frequencies — this is a <strong>huge opportunity</strong>.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><br>Loading games...</div>';
+
+            const params = new URLSearchParams({
+                tags: combo.tags.join(','),
+                limit: 100,
+            });
+
+            try {
+                const resp = await fetch(`/api/games?${params}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+
+                container.innerHTML = '';
+                const countText = data.games.length < data.count
+                    ? `${data.games.length} of ${data.count.toLocaleString()} games shown (first 100)`
+                    : `${data.count} games found`;
+                container.innerHTML = `<p style="margin-bottom: 12px; color: var(--text-dim);">${countText}</p>`;
+
+                data.games.forEach(game => {
+                    const card = document.createElement('div');
+                    card.className = 'game-card';
+
+                    const tagsHtml = game.tags.slice(0, 12).map(t => {
+                        const isHighlight = combo.tags.includes(t);
+                        return `<span class="game-tag ${isHighlight ? 'highlight' : ''}">${t}</span>`;
+                    }).join('');
+
+                    card.innerHTML = `
+                        <div class="game-info">
+                            <div class="game-appid">App ID: ${game.app_id}</div>
+                            <div class="game-tags">${tagsHtml}</div>
+                        </div>
+                        <a href="${game.url}" target="_blank" class="game-link">View on Steam</a>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (err) {
+                container.innerHTML = `<div class="loading">Error loading games: ${err.message}</div>`;
+            }
+        }
+
+        // Close modal
+        document.getElementById('modal-close').addEventListener('click', () => {
+            document.getElementById('games-modal').classList.remove('active');
+        });
+
+        document.getElementById('games-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('games-modal')) {
+                document.getElementById('games-modal').classList.remove('active');
+            }
+        });
+
+        // Initial load
+        loadTags(0);
+
+        // Tab switcher
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const tab = btn.dataset.tab;
+                document.getElementById('explorer-mode').style.display = tab === 'explorer' ? 'block' : 'none';
+                document.getElementById('random-mode').style.display = tab === 'random' ? 'block' : 'none';
+            });
+        });
+
+        // Random mode
+        const spinBtn = document.getElementById('spin-btn');
+        const slotMachine = document.getElementById('slot-machine');
+        const revealStats = document.getElementById('reveal-stats');
+        let currentRevealCombo = null;
+
+        spinBtn.addEventListener('click', spinChest);
+        document.getElementById('reveal-again').addEventListener('click', spinChest);
+        document.getElementById('reveal-explore').addEventListener('click', () => {
+            if (currentRevealCombo) {
+                // Switch to explorer mode and show the combo
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector('[data-tab="explorer"]').classList.add('active');
+                document.getElementById('explorer-mode').style.display = 'block';
+                document.getElementById('random-mode').style.display = 'none';
+                // Show the combo in the results
+                state.currentResults = [currentRevealCombo];
+                renderResults([currentRevealCombo]);
+            }
+        });
+
+        async function spinChest() {
+            spinBtn.disabled = true;
+            spinBtn.textContent = '🎰 Opening...';
+            slotMachine.classList.remove('active');
+            revealStats.classList.remove('active');
+
+            // Fetch a random rare/unexplored combination
+            try {
+                const resp = await fetch('/api/random_combination');
+                const combo = await resp.json();
+
+                if (!combo) {
+                    alert('No rare combinations found!');
+                    spinBtn.disabled = false;
+                    spinBtn.textContent = '🎰 Open Chest';
+                    return;
+                }
+
+                currentRevealCombo = combo;
+
+                // Start the slot machine animation
+                await animateSlotMachine(combo);
+
+                // Show the stats
+                revealStats.classList.add('active');
+                document.getElementById('reveal-count').textContent = combo.count;
+                document.getElementById('reveal-count').className = `value ${combo.count === 0 ? 'zero' : ''}`;
+                document.getElementById('reveal-expected').textContent = combo.expected;
+                document.getElementById('reveal-lift').textContent = combo.lift;
+
+                // Particles!
+                spawnParticles(combo.unexplored);
+
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Error: ' + err.message);
+            } finally {
+                spinBtn.disabled = false;
+                spinBtn.textContent = '🎰 Open Chest';
+            }
+        }
+
+        function animateSlotMachine(combo) {
+            return new Promise(resolve => {
+                const tags = combo.tags;
+                const n = tags.length;
+
+                // Show the slot machine with n reels
+                slotMachine.classList.add('active');
+
+                // Clear previous reels
+                for (let i = 0; i < 3; i++) {
+                    const container = document.getElementById(`reel-container-${i}`);
+                    const reel = document.getElementById(`reel-${i}`);
+                    if (container) {
+                        container.style.display = i < n ? 'block' : 'none';
+                        reel.innerHTML = '';
+                    }
+                }
+
+                // Get all tags for spinning
+                const allTags = state.tags.map(t => t.name);
+                if (allTags.length === 0) {
+                    // Fallback if tags not loaded
+                    allTags.push('Action', 'Adventure', 'Indie', 'RPG', 'Strategy', 'Simulation');
+                }
+
+                // Animate each reel
+                const reelTimers = [];
+                const baseDelay = 800; // ms per reel
+                const spinDuration = 1500; // ms of spinning
+
+                for (let i = 0; i < n; i++) {
+                    const reel = document.getElementById(`reel-${i}`);
+                    const container = document.getElementById(`reel-container-${i}`);
+                    let spinCount = 0;
+                    const maxSpins = 15 + i * 5; // More spins for later reels
+
+                    const spinInterval = setInterval(() => {
+                        const randomTag = allTags[Math.floor(Math.random() * allTags.length)];
+                        reel.innerHTML = `<div class="slot-item spinning">${randomTag}</div>`;
+                        spinCount++;
+
+                        if (spinCount >= maxSpins) {
+                            clearInterval(spinInterval);
+                            // Reveal the final tag
+                            reel.innerHTML = `<div class="slot-item">${tags[i]}</div>`;
+                            container.classList.add(combo.unexplored ? 'unexplored-reveal' : 'revealed');
+
+                            // Play a sound effect (visual feedback instead)
+                            container.style.transform = 'scale(1.05)';
+                            setTimeout(() => {
+                                container.style.transform = 'scale(1)';
+                            }, 200);
+                        }
+                    }, 80);
+
+                    reelTimers.push(spinInterval);
+                }
+
+                // Resolve after all reels are done
+                setTimeout(() => {
+                    resolve();
+                }, baseDelay * n + spinDuration + 500);
+            });
+        }
+
+        function spawnParticles(isUnexplored) {
+            const container = document.createElement('div');
+            container.className = 'particles';
+            document.body.appendChild(container);
+
+            const colors = isUnexplored
+                ? ['#ff6b6b', '#e94560', '#533483', '#ffaa00', '#00d474']
+                : ['#533483', '#e94560', '#00d474', '#ffaa00', '#333'];
+
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = `${Math.random() * 100}%`;
+                particle.style.top = `${Math.random() * 50}%`;
+                particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                particle.style.animationDelay = `${Math.random() * 0.5}s`;
+                particle.style.animationDuration = `${0.8 + Math.random() * 0.5}s`;
+                container.appendChild(particle);
+            }
+
+            setTimeout(() => {
+                container.remove();
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
