@@ -1,0 +1,400 @@
+<!doctype html>
+<!-- `is-booting` is written here rather than set by a script, so the panels are out of the way from the
+     very first painted frame instead of flashing a page of controls that cannot answer yet. main.js
+     removes it once the catalog is indexed. See the boot block at the top of <main>. -->
+<html lang="en" class="is-booting">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Steam Tags Explorer — search Steam tag combinations by how rare they are, take random tag draws, and find tag combinations that no catalogued game uses.">
+<title>Steam Tags Explorer — Steam tag combinations by rarity</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div class="flash" id="flash" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">🏷️</span>
+    <span class="brand-text">
+      <span class="brand-name">Steam Tags Explorer</span>
+      <span class="brand-sub">Steam tag combinations, by rarity</span>
+    </span>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Modes">
+    <button class="tab is-active" id="tab-finder" data-view="finder" role="tab" aria-selected="true" aria-controls="view-finder">Finder</button>
+    <button class="tab" id="tab-crate" data-view="crate" role="tab" aria-selected="false" aria-controls="view-crate">Random draw</button>
+    <button class="tab" id="tab-draft" data-view="draft" role="tab" aria-selected="false" aria-controls="view-draft">Draft pick</button>
+    <button class="tab" id="tab-uncharted" data-view="uncharted" role="tab" aria-selected="false" aria-controls="view-uncharted">Missed opportunities</button>
+  </nav>
+
+  <div class="library">
+    <p class="library-meta" id="libraryMeta">Loading the catalog…</p>
+    <div class="library-controls">
+      <a class="btn btn-ghost repo-link" href="https://github.com/mickabrig7/steam-tags-explorer"
+         title="Source code on GitHub">
+        <svg class="repo-mark" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.76.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A7.995 7.995 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        <span>Code</span>
+      </a>
+      <button class="btn btn-ghost" id="soundBtn" type="button" aria-pressed="true">Sound on</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- -------------------------- while the catalog loads -------------------------- -->
+  <!-- The one part of opening this page that is not instant: the catalog is a single 7 MB file, and
+       every panel answers from the index built out of it in this browser. Until that is done the
+       panels are hidden rather than left sitting there pressable, and this block says how far the
+       load got — bytes down, then unpacking and indexing. It is a live region, so a screen reader
+       hears the stages as well, and it is also what a failed load reports on. -->
+  <section class="boot" id="boot" role="status" aria-live="polite" aria-busy="true">
+    <h1 class="boot-title">Reading the catalog</h1>
+    <p class="boot-status" id="bootStatus">Connecting…</p>
+    <div class="boot-bar" aria-hidden="true"><span class="boot-fill" id="bootFill"></span></div>
+    <p class="boot-note">One file holding every game, tag and tag pair, indexed here in the browser —
+      nothing stands between a press and an answer. A repeat visit reads it from the browser cache and
+      starts at the indexing.</p>
+    <button class="btn btn-ghost boot-retry" id="bootRetry" type="button" hidden>Try again</button>
+  </section>
+  <!-- Every panel is built from the same skeleton, so the reader meets the controls in the
+       same place four times: a head (title + what the mode answers), then a body split into
+       the controls on the left and the reference tables on the right. The left column runs
+       in one order everywhere — settings, then buttons, then the status line that reports
+       what the panel just did. That line always holds one line's height, whether or not
+       there is anything to say, so a button never moves because a sentence changed.
+       A reference that belongs to one specific field sits directly above the settings, so it
+       is read before the choice it explains; everything else that belongs to the mode (the
+       reel, the dealt pool, the results) sits under the body. -->
+
+  <!-- ------------------------------- Finder ------------------------------- -->
+  <section class="view" id="view-finder" role="tabpanel" aria-labelledby="tab-finder" tabindex="0">
+    <div class="console console-finder">
+      <div class="console-head">
+        <h2 class="console-title">Search tag combinations</h2>
+        <p class="hint">
+          Type tags, set the size and the rarity, then press “Search combinations”.
+          Each press is a fresh random pick from what it finds.
+        </p>
+      </div>
+
+      <div class="console-body">
+        <div class="console-controls">
+          <div class="tag-search">
+            <input id="tagInput" type="search" placeholder="Search tags — try “roguelike” or “programming”" autocomplete="off" aria-label="Search tags">
+            <ul class="suggest" id="tagSuggest" hidden></ul>
+          </div>
+
+          <div class="chips" id="chips"></div>
+
+          <div class="control-row">
+            <label class="field">
+              <span>Tags per combination</span>
+              <select id="finderK">
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </label>
+            <label class="field field-wide">
+              <span>Rarity</span>
+              <select id="finderRarity"></select>
+            </label>
+          </div>
+
+          <div class="action-row">
+            <button class="btn btn-primary" id="finderGo" type="button">Search combinations</button>
+            <button class="btn btn-ghost" id="finderClear" type="button">Clear</button>
+          </div>
+
+          <p class="stat-line" id="finderStat"></p>
+        </div>
+
+        <div class="console-legends">
+          <div class="legend-host" id="legendRarityFinder"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="results" id="finderResults">
+      <p class="empty-state">Nothing searched yet. Press “Search combinations”.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------- Crate -------------------------------- -->
+  <section class="view" id="view-crate" role="tabpanel" aria-labelledby="tab-crate" tabindex="0" hidden>
+    <div class="console console-crate">
+      <div class="console-head">
+        <h2 class="console-title">Random tag draw</h2>
+        <p class="hint">
+          One tag combination, drawn at random. The reel stops where it stops.
+        </p>
+      </div>
+
+      <!-- The crate picker's reference: every crate in the select and what it draws from. It
+           sits where the choice is made — under the mode description, above the crate field —
+           so the answer to “what is the difference between these?” is read before the pick,
+           not after it. It folds away, because on a phone seven crates would push the button
+           off the first screen. -->
+      <div class="legend-host legend-host-cases" id="legendCaseCrate"></div>
+
+      <div class="console-body">
+        <div class="console-controls">
+          <div class="control-row">
+            <label class="field">
+              <span>Crate</span>
+              <select id="crateCase"></select>
+            </label>
+            <label class="field">
+              <span>Tags per combination</span>
+              <select id="crateK">
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </label>
+            <label class="field field-wide">
+              <span>Rarity</span>
+              <select id="crateRarity"></select>
+            </label>
+          </div>
+
+          <div class="action-row">
+            <button class="btn btn-crate" id="crateOpen" type="button">Open crate</button>
+          </div>
+
+          <p class="stat-line" id="crateNote">Nothing drawn yet.</p>
+        </div>
+
+        <div class="console-legends">
+          <div class="legend-host" id="legendRarityCrate"></div>
+        </div>
+      </div>
+
+      <div class="crate-stage" id="crateStage">
+        <div class="reel" id="crateReel" aria-live="polite">
+          <div class="reel-strip" id="crateStrip"></div>
+          <div class="crate-art" id="crateArt" aria-hidden="true">
+            <span class="crate-glow"></span>
+            <span class="crate-box"></span>
+            <span class="crate-lid"></span>
+          </div>
+          <div class="reel-needle" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="reveal" id="crateReveal" hidden></div>
+
+      <div class="crate-side">
+        <div class="streak" id="crateStreak"></div>
+        <div class="side-block" id="crateLadderBlock" hidden>
+          <h3 class="side-title">Other combinations in this draw</h3>
+          <div class="ladder" id="crateLadder"></div>
+        </div>
+        <div class="side-block">
+          <h3 class="side-title">Draw history</h3>
+          <div class="history" id="crateHistory"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ------------------------------- Draft -------------------------------- -->
+  <section class="view" id="view-draft" role="tabpanel" aria-labelledby="tab-draft" tabindex="0" hidden>
+    <div class="console console-crate console-draft">
+      <div class="console-head">
+        <h2 class="console-title">Draft pick</h2>
+        <p class="hint">
+          A pool of tags is dealt out of the whole catalog. Disable some of them, then draw
+          from what is left.
+        </p>
+      </div>
+
+      <div class="console-body">
+        <div class="console-controls">
+          <div class="control-row">
+            <label class="field">
+              <span>Tags per combination</span>
+              <select id="draftK">
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Tags shown</span>
+              <select id="draftShown">
+                <option value="6">6</option>
+                <option value="8">8</option>
+                <option value="10">10</option>
+                <option value="12" selected>12</option>
+                <option value="16">16</option>
+                <option value="20">20</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Tags to disable</span>
+              <select id="draftDrop"></select>
+            </label>
+            <label class="field field-wide">
+              <span>Rarity</span>
+              <select id="draftRarity"></select>
+            </label>
+          </div>
+
+          <p class="stat-line" id="draftStat"></p>
+
+          <div class="chips" id="draftPool" aria-label="Tags shown in this draft"></div>
+
+          <!-- The pool is what a draft is played on, so the two things you do to it — take a new
+               deal, draw from what is left — come after it, in the order the panel is read. -->
+          <div class="action-row">
+            <button class="btn btn-ghost" id="draftDeal" type="button">Show new tags</button>
+            <button class="btn btn-crate" id="draftOpen" type="button" disabled>Open crate</button>
+          </div>
+
+          <p class="draw-note" id="draftNote">Press “Show new tags”.</p>
+        </div>
+
+        <div class="console-legends">
+          <div class="legend-host" id="legendRarityDraft"></div>
+        </div>
+      </div>
+
+      <div class="crate-stage" id="draftStage">
+        <div class="reel" id="draftReel" aria-live="polite">
+          <div class="reel-strip" id="draftStrip"></div>
+          <div class="crate-art" id="draftArt" aria-hidden="true">
+            <span class="crate-glow"></span>
+            <span class="crate-box"></span>
+            <span class="crate-lid"></span>
+          </div>
+          <div class="reel-needle" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="reveal" id="draftReveal" hidden></div>
+
+      <div class="crate-side">
+        <div class="streak" id="draftStreak"></div>
+        <div class="side-block" id="draftLadderBlock" hidden>
+          <h3 class="side-title">Other combinations in this draw</h3>
+          <div class="ladder" id="draftLadder"></div>
+        </div>
+        <div class="side-block">
+          <h3 class="side-title">Draw history</h3>
+          <div class="history" id="draftHistory"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- --------------------------- Missed opportunities ---------------------- -->
+  <section class="view" id="view-uncharted" role="tabpanel" aria-labelledby="tab-uncharted" tabindex="0" hidden>
+    <div class="console console-space">
+      <div class="console-head">
+        <h2 class="console-title">Missed opportunities</h2>
+        <p class="hint">
+          Tag combinations that <strong>zero</strong> catalogued games carry, built only from
+          tags people actually use. The floor sets how popular a tag has to be to count.
+        </p>
+      </div>
+
+      <div class="console-body">
+        <div class="console-controls">
+          <div class="control-row">
+            <label class="field">
+              <span>Tags per combination</span>
+              <select id="spaceK">
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </label>
+            <label class="field field-wide">
+              <span>Tags used by at least</span>
+              <select id="spaceFloor">
+                <option value="250">250 games</option>
+                <option value="1000" selected>1,000 games</option>
+                <option value="3000">3,000 games</option>
+                <option value="10000">10,000 games</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="action-row">
+            <button class="btn btn-primary" id="spaceGo" type="button">Search missed opportunities</button>
+          </div>
+
+          <p class="stat-line" id="spaceStat"></p>
+        </div>
+
+        <div class="console-legends">
+          <div class="legend-host" id="legendRaritySpace"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="radar" id="radar">
+      <span class="radar-sweep"></span>
+      <span class="radar-ring r1"></span>
+      <span class="radar-ring r2"></span>
+      <span class="radar-ring r3"></span>
+      <span class="radar-blip b1"></span>
+      <span class="radar-blip b2"></span>
+      <span class="radar-blip b3"></span>
+    </div>
+
+    <div class="results" id="spaceResults">
+      <p class="empty-state">Nothing searched yet. Press “Search missed opportunities”.</p>
+    </div>
+  </section>
+</main>
+
+<!-- --------------------------- saved combinations ---------------------------
+     One panel for every mode: each mode's results carry a save button, and the
+     saved combination always lands here, in the panel pinned to the right edge. -->
+<aside class="vault" id="vault" aria-label="Saved combinations">
+  <button class="vault-rail" id="vaultToggle" type="button" aria-expanded="false" aria-controls="vaultPanel"
+          title="Saved combinations — click to open the panel">
+    <span class="vault-rail-arrow" aria-hidden="true">›</span>
+    <span class="vault-rail-icon" aria-hidden="true">🗂</span>
+    <span class="vault-rail-label">Saved</span>
+    <span class="vault-rail-count" id="vaultCount">0</span>
+  </button>
+
+  <p class="vault-flag" id="vaultFlag" aria-hidden="true">Saved</p>
+
+  <div class="vault-panel" id="vaultPanel" hidden>
+    <div class="vault-head">
+      <span class="vault-title">Saved combinations</span>
+      <span class="vault-sub" id="vaultSub">nothing saved yet</span>
+      <button class="btn btn-mini btn-ghost" id="vaultCollapse" type="button" aria-label="Collapse the saved panel">
+        close
+      </button>
+    </div>
+    <p class="vault-tip">Every mode saves here.</p>
+    <div class="vault-list" id="vaultList" tabindex="0" role="region" aria-label="Saved combinations, scrollable"></div>
+  </div>
+</aside>
+
+<footer class="foot">
+  <p>
+    Every count comes from a local copy of the Steam storefront — the community tags on each
+    game’s page. Steam’s own tag pages also count DLC and bundles, so their numbers run higher.
+  </p>
+  <p class="foot-links"><a href="https://store.steampowered.com/" rel="noopener noreferrer">Steam storefront</a> · Steam Tags Explorer is a fan tool and is not affiliated with Valve.</p>
+</footer>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

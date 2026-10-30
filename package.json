@@ -1,0 +1,17 @@
+{
+  "name": "steam-tags-explorer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Steam Tags Explorer \u2014 search Steam tag-combination rarity, open random tag draws, and chart the combinations no catalogued game carries.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js",
+    "update-snapshot": "node scripts/update-snapshot.js",
+    "check-catalog": "node scripts/check-catalog.js"
+  }
+}

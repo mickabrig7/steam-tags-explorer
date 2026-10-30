@@ -1,0 +1,15 @@
+# `public/data/catalog.bin.gz` is deliberately NOT ignored: it is the whole catalog —
+# ~7 MB of typed arrays and two dates, no absolute paths and no local state. The app
+# runs on it here, GitHub Pages serves it from there, and `npm run update-snapshot`
+# rewrites it in place. The only copy made of it is the one `update-snapshot.js` keeps
+# before replacing the file, so a refresh can be undone. Those live here.
+backups/
+
+# Local scratch a working session leaves behind: probe scripts, throwaway browser
+# profiles, logs. Keep it under .probe/ — a browser profile holds real logins, and
+# none of this belongs in a release.
+.probe/
+
+node_modules/
+.DS_Store
+Thumbs.db

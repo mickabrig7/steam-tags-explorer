@@ -1,0 +1,100 @@
+# Publish the site, and keep its catalog current.
+
+# The site is `public/` exactly as it sits in the repository — no build step — plus the one
+# catalog file `public/data/catalog.bin.gz`, which the page loads in the visitor's browser.
+# That committed file is where every refresh starts, so a crawl cut short still leaves it
+# further along than it was.
+#
+# One job, in order: read Steam, check the file, commit it if it changed, publish `public/`.
+#
+# A crawl that comes from GitHub's addresses is sometimes blocked, so the crawl step is
+# allowed to fail and the updater refuses to write a *smaller* catalog than the one it read:
+# either way the site keeps the numbers it already had.
+#
+# Pages has to be set to deploy from GitHub Actions: Settings → Pages → Source: GitHub
+# Actions. `public/.nojekyll` keeps Pages from running Jekyll over the tree.
+
+name: Publish the site
+
+on:
+  schedule:
+    # Every third day at midnight UTC. Nothing here is time-sensitive, so the schedule is
+    # only a way of remembering; a run can be started by hand whenever you want one.
+    - cron: '0 0 */3 * *'
+  workflow_dispatch:
+    inputs:
+      crawl:
+        description: 'Read Steam first, or publish the catalog exactly as it is?'
+        type: choice
+        required: false
+        default: 'read Steam'
+        choices:
+          - 'read Steam'
+          - 'publish as it is'
+      limit:
+        description: 'Most store pages to read in this run'
+        required: false
+        default: '12000'
+
+# One run at a time: two of them editing the same catalog file would fight over it.
+concurrency:
+  group: publish-site
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # push a refreshed catalog back to this repository
+  pages: write      # deploy the site
+  id-token: write   # proves to Pages that this run belongs to the repository
+
+jobs:
+  publish:
+    name: Update the catalog and publish the site
+    runs-on: ubuntu-latest
+    timeout-minutes: 210
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Read Steam and rewrite the catalog
+        # Gentler than a local run (250 ms / 3 workers), because this address belongs to
+        # GitHub. Skipped by choice when someone runs the workflow by hand and says so.
+        if: github.event_name != 'workflow_dispatch' || inputs.crawl == 'read Steam'
+        continue-on-error: true
+        run: |
+          node scripts/update-snapshot.js \
+            --limit "${{ inputs.limit || '12000' }}" \
+            --delay 500 \
+            --concurrency 2 \
+            --no-backup
+
+      - name: Check the catalog still answers the questions
+        run: node scripts/check-catalog.js
+
+      - name: Commit the new catalog if the crawl changed it
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- public/data/catalog.bin.gz; then
+            echo "the crawl changed nothing"
+          else
+            git add public/data/catalog.bin.gz
+            git commit -m "Update the catalog from Steam"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
