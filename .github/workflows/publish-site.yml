@@ -28,11 +28,12 @@ on:
         type: choice
         required: false
         default: 'read Steam'
-        choices:
+        options:
           - 'read Steam'
           - 'publish as it is'
       limit:
         description: 'Most store pages to read in this run'
+        type: string
         required: false
         default: '12000'
 
