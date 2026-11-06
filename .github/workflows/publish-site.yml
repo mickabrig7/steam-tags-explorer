@@ -18,9 +18,9 @@ name: Publish the site
 
 on:
   schedule:
-    # Every third day at midnight UTC. Nothing here is time-sensitive, so the schedule is
+    # Every day at midnight UTC. Nothing here is time-sensitive, so the schedule is
     # only a way of remembering; a run can be started by hand whenever you want one.
-    - cron: '0 0 */3 * *'
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       crawl:

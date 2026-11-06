@@ -105,7 +105,7 @@ unpacked — so a fresh clone is already a working app with real numbers.
 is gone or behind an age check, and it never writes a smaller catalog than the one it was given. Flags worth
 knowing: `--dry-run 10`, `--limit 500`, `--new-only`, `--recheck 200`, and `--in`/`--out` to work on a copy.
 
-The **Publish the site** workflow runs that command every third day, and whenever you start it by hand. It
+The **Publish the site** workflow runs that command every day, and whenever you start it by hand. It
 reads at most 12,000 store pages, checks the result with those 25 questions before committing anything, and
 then sends `public/` to GitHub Pages. Steam sometimes blocks a crawl coming from GitHub's addresses; when it
 does, the committed file is left alone and the site keeps the numbers it had.

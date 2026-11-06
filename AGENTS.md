@@ -104,7 +104,7 @@ handlers, plus the invariant. A non-200, `found > 0` with no cards back, or inva
 ## Publishing
 
 `.github/workflows/publish-site.yml` is one job: crawl Steam (allowed to fail) → `check-catalog` → commit the
-file if it changed → upload `public/` as a Pages artifact → deploy. Scheduled `0 0 */3 * *` (every third day
+file if it changed → upload `public/` as a Pages artifact → deploy. Scheduled `0 0 * * *` (every day
 at midnight UTC) and by hand. The manual choice **"publish as it is"** skips the crawl; a crawl that *fails*
 still publishes, because the file then is the one that was already committed, and `check-catalog` between
 them is what stops a file that answers nothing from going out. The crawl is the fragile half — datacenter
@@ -176,6 +176,14 @@ Four modes share one skeleton: `section.console[-finder|-crate|-draft|-space]` �
 block, Random draw only) → `.console-body` (controls, then the rarity block; legend below at ≤1000px) → the
 mode's material. Draft pick is the exception: **Show new tags** and **Open crate** come after `#draftPool`,
 because those buttons act on the pool.
+
+The four tabs read one document, so each keeps its **own** place in it: `main.js showView` saves the
+outgoing panel's `window.scrollY` before the swap and restores the incoming panel's after it, since the
+swap is what changes the document's height. A deeper saved position is clamped by the browser, and a panel
+never visited starts at the top. The whole-combination press (`openInFinder(tags, { run: true })`) is the
+exception that moves on purpose: before searching it places the page at the top of the results host, whose
+`scroll-margin-top` lands it under the sticky bar, so a jump from another mode starts at its answer, not
+where the Finder was left.
 
 `fx.js scrollToInterest(node)` brings an answer into view, but only when it is genuinely out of hand: the
 target's **own top edge** below the sticky bar **and** at least `minVisible` (200 px) of it showing. Paging

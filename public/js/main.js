@@ -150,7 +150,12 @@ export function openInFinder(tags, { run = true } = {}) {
   setSelected(picked);
   document.getElementById('finderK').value = String(Math.max(2, Math.min(MAX_TAGS, picked.length)));
   showView('finder');
-  if (run) window.dispatchEvent(new CustomEvent('steamtage:run-finder'));
+  if (!run) return;
+  // A press that names the whole combination promises an answer, so the page lands at the top of
+  // the results host (its `scroll-margin-top` clears the sticky bar) before asking, however deep
+  // the Finder was left. The saved place is for tab presses; this one says "look what I found".
+  document.getElementById('finderResults').scrollIntoView({ block: 'start', inline: 'nearest' });
+  window.dispatchEvent(new CustomEvent('steamtage:run-finder'));
 }
 
 /**
@@ -228,7 +233,21 @@ function announceTags(detail = {}) {
 
 /* --------------------------------- routing --------------------------------- */
 
+/**
+ * Four tabs over one document, so each mode keeps its **own** place in the page: leaving a panel
+ * saves where it was scrolled, and coming back puts the page there again. The save happens before
+ * the outgoing panel is hidden and the restore after the incoming one is shown, because the swap
+ * changes the document's height — a position deeper than the new document is simply clamped by the
+ * browser, and the number stored for the panel left behind stays whole. A panel never visited
+ * starts at the top. Presses that route to the Finder with the Finder already open (a chip on a
+ * saved row) take the same path and land where they were, because the saved number is the current
+ * one. The whole-combination jump in `openInFinder` is the press that deliberately moves: it
+ * places the page at the top of the results before the search runs. */
+const scrollByView = new Map();
+let shownView = 'finder'; // the tab the markup opens active
+
 function showView(name) {
+  scrollByView.set(shownView, window.scrollY);
   // `hidden` is all a panel needs; `aria-selected` belongs to the tab, not the panel.
   for (const [key, node] of Object.entries(views)) {
     node.hidden = key !== name;
@@ -238,6 +257,9 @@ function showView(name) {
     tab.classList.toggle('is-active', active);
     tab.setAttribute('aria-selected', active ? 'true' : 'false');
   }
+  shownView = name;
+  const at = scrollByView.get(name) || 0;
+  if (window.scrollY !== at) window.scrollTo(0, at);
   window.dispatchEvent(new CustomEvent('steamtage:view', { detail: { view: name } }));
 }
 
